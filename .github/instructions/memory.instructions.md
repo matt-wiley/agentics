@@ -20,3 +20,9 @@ The following content is all of the memorized information that the AI assistant 
 - **Content**: `/home/matt/Repospace/com/github/matt-wiley/agentics/.venv/bin/python`
 - **Context**: Use this specific Python executable when running Python commands, scripts, or tests in this project. The project has a virtual environment set up with uv.
 
+### Documentation Organization Standard
+- **Type**: Project preference
+- **Key**: Documentation file location
+- **Content**: Create new documentation files in either the `notes/` directory or the `docs/` directory
+- **Context**: This includes workplans, task summaries, and other markdown or plaintext files that provide additional context about the project. Use for any documentation creation tasks.
+

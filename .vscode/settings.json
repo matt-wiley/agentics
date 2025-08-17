@@ -22,6 +22,7 @@
         "cat": true,
         "ls": true,
         "pwd": true,
+        "wc": true,
         "/home/matt/Repospace/com/github/matt-wiley/agentics/.venv/bin/python": true,
     }
 }
