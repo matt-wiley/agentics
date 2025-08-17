@@ -15,6 +15,9 @@
         "git diff": true,
         "git diff --cached": true,
         "git add": true,
-        "git commit": true
+        "git commit": true,
+        "cat": true,
+        "ls": true,
+        "pwd": true
     }
 }
