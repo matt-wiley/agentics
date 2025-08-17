@@ -1,5 +1,11 @@
 # AI Coding Agent Instructions for Agentics
 
+## Prerequisites
+
+Review the following files to understand how you should act and what you should know before working with this project:
+- `.github/memory.instructions.md`: Contains all memorized information
+
+
 ## Project Overview
 This is a study project focused on LLM Agentic Applications, featuring a security-focused single-file agent implementation (`simplest_agent.py`) that uses LangChain + Ollama with a custom SafeCalculator tool.
 

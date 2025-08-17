@@ -19,6 +19,7 @@
         "git show": true,
         "cat": true,
         "ls": true,
-        "pwd": true
+        "pwd": true,
+        "/home/matt/Repospace/com/github/matt-wiley/agentics/.venv/bin/python": true
     }
 }
