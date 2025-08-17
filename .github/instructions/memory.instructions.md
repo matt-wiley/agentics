@@ -23,6 +23,6 @@ The following content is all of the memorized information that the AI assistant 
 ### Documentation Organization Standard
 - **Type**: Project preference
 - **Key**: Documentation file location
-- **Content**: Create new documentation files in either the `notes/` directory or the `docs/` directory
+- **Content**: Create new documentation files in either the `notes/` directory or the `docs/` directory, or an appropriate sub-directory of those
 - **Context**: This includes workplans, task summaries, and other markdown or plaintext files that provide additional context about the project. Use for any documentation creation tasks.
 
