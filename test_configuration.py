@@ -34,7 +34,9 @@ class MockBaseModel:
     pass
 
 class MockField:
-    pass
+    def __init__(self, *args, **kwargs):
+        # Accept any arguments like the real Field
+        pass
 
 # Add mocked classes to modules
 sys.modules['langchain_ollama'].ChatOllama = MockChatOllama
@@ -84,7 +86,7 @@ def test_configuration_system():
         print("\nTesting environment variable override...")
         with patch.dict(os.environ, {
             'AGENT_MODEL': 'test-model',
-            'AGENT_PROVIDER': 'openai',
+            'AGENT_PROVIDER': 'ollama',  # Use ollama to avoid API key requirement
             'AGENT_TEMPERATURE': '0.5',
             'RETRY_MAX_ATTEMPTS': '5'
         }):

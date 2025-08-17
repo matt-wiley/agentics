@@ -3,7 +3,7 @@
 ## Prerequisites
 
 Review the following files to understand how you should act and what you should know before working with this project:
-- `.github/memory.instructions.md`: Contains all memorized information
+- `.github/instructions/memory.instructions.md`: Contains all memorized information
 
 
 ## Project Overview

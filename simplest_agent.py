@@ -961,6 +961,378 @@ Thought:"""
 
 
 # ==========================================================
+#   Health Monitoring and Status Reporting System
+# ==========================================================
+
+@dataclass
+class HealthStatus:
+    """Health status data structure for system monitoring."""
+    component: str
+    status: str  # "healthy", "degraded", "unhealthy"
+    details: Dict[str, Any]
+    response_time_ms: Optional[float] = None
+    last_check: datetime = field(default_factory=datetime.now)
+    error_message: Optional[str] = None
+
+
+@dataclass 
+class SystemHealthReport:
+    """Comprehensive system health report."""
+    overall_status: str  # "healthy", "degraded", "unhealthy"
+    components: List[HealthStatus]
+    performance_metrics: Dict[str, Any]
+    error_statistics: Dict[str, Any]
+    timestamp: datetime = field(default_factory=datetime.now)
+
+
+class HealthChecker:
+    """Comprehensive system health monitoring and status reporting."""
+
+    def __init__(self, llm=None, tools=None, circuit_breaker=None, error_handler=None, config=None):
+        self.llm = llm
+        self.tools = tools or []
+        self.circuit_breaker = circuit_breaker or llm_circuit_breaker
+        self.error_handler = error_handler or error_handler
+        self.config = config or config
+        self.last_health_check: Optional[datetime] = None
+        self.health_check_interval = 30  # seconds between automatic checks
+
+    def check_model_connectivity(self) -> HealthStatus:
+        """Test LLM model connectivity and responsiveness."""
+        start_time = time.time()
+        
+        try:
+            if not self.llm:
+                return HealthStatus(
+                    component="llm_model",
+                    status="unhealthy",
+                    details={"error": "LLM not initialized"},
+                    error_message="Language model is not available"
+                )
+
+            # Test with a simple prompt
+            test_response = self.llm.invoke("Say 'OK' if you can respond.")
+            response_time_ms = (time.time() - start_time) * 1000
+            
+            # Validate response
+            if hasattr(test_response, 'content') and test_response.content:
+                try:
+                    response_content = str(test_response.content).strip().lower()
+                    content_length = len(response_content)
+                except (TypeError, AttributeError):
+                    # Handle cases where content is not a string (e.g., during testing)
+                    response_content = str(test_response.content)
+                    content_length = len(response_content) if hasattr(response_content, '__len__') else 0
+                
+                # Check for reasonable response
+                if content_length > 0 and content_length < 1000:
+                    return HealthStatus(
+                        component="llm_model",
+                        status="healthy",
+                        details={
+                            "model": self.config.model_name,
+                            "provider": self.config.model_provider,
+                            "response_length": content_length,
+                            "test_successful": True
+                        },
+                        response_time_ms=response_time_ms
+                    )
+                else:
+                    return HealthStatus(
+                        component="llm_model",
+                        status="degraded",
+                        details={
+                            "model": self.config.model_name,
+                            "response_length": content_length,
+                            "issue": "Unexpected response format"
+                        },
+                        response_time_ms=response_time_ms,
+                        error_message="Model response format is unexpected"
+                    )
+            else:
+                return HealthStatus(
+                    component="llm_model",
+                    status="unhealthy",
+                    details={
+                        "model": self.config.model_name,
+                        "response": str(test_response)
+                    },
+                    response_time_ms=response_time_ms,
+                    error_message="Model did not provide expected response"
+                )
+
+        except Exception as e:
+            response_time_ms = (time.time() - start_time) * 1000
+            error_message = str(e)
+            
+            # Classify the error using our existing system
+            handled_error = self.error_handler.handle_error(e, operation="health_check_llm")
+            
+            return HealthStatus(
+                component="llm_model",
+                status="unhealthy",
+                details={
+                    "model": self.config.model_name,
+                    "error_category": handled_error.category.value,
+                    "error_type": type(e).__name__
+                },
+                response_time_ms=response_time_ms,
+                error_message=error_message
+            )
+
+    def check_tool_availability(self) -> List[HealthStatus]:
+        """Validate that all tools are functional and available."""
+        tool_statuses = []
+        
+        for tool in self.tools:
+            start_time = time.time()
+            tool_name = getattr(tool, 'name', type(tool).__name__)
+            
+            try:
+                # Test calculator tool specifically
+                if hasattr(tool, 'name') and tool.name == "calculator":
+                    # Test with a simple calculation
+                    test_result = tool._run("2 + 2")
+                    response_time_ms = (time.time() - start_time) * 1000
+                    
+                    if test_result == "4" or test_result == "4.0":
+                        tool_statuses.append(HealthStatus(
+                            component=f"tool_{tool_name}",
+                            status="healthy",
+                            details={
+                                "tool_type": type(tool).__name__,
+                                "test_calculation": "2 + 2",
+                                "result": test_result
+                            },
+                            response_time_ms=response_time_ms
+                        ))
+                    else:
+                        tool_statuses.append(HealthStatus(
+                            component=f"tool_{tool_name}",
+                            status="degraded",
+                            details={
+                                "tool_type": type(tool).__name__,
+                                "test_calculation": "2 + 2",
+                                "unexpected_result": test_result
+                            },
+                            response_time_ms=response_time_ms,
+                            error_message=f"Tool returned unexpected result: {test_result}"
+                        ))
+                else:
+                    # Generic tool test - just check if it has required methods
+                    response_time_ms = (time.time() - start_time) * 1000
+                    has_run_method = hasattr(tool, '_run') or hasattr(tool, 'run')
+                    has_description = hasattr(tool, 'description')
+                    
+                    if has_run_method and has_description:
+                        tool_statuses.append(HealthStatus(
+                            component=f"tool_{tool_name}",
+                            status="healthy",
+                            details={
+                                "tool_type": type(tool).__name__,
+                                "has_run_method": has_run_method,
+                                "has_description": has_description,
+                                "description": getattr(tool, 'description', 'N/A')[:100]
+                            },
+                            response_time_ms=response_time_ms
+                        ))
+                    else:
+                        tool_statuses.append(HealthStatus(
+                            component=f"tool_{tool_name}",
+                            status="degraded",
+                            details={
+                                "tool_type": type(tool).__name__,
+                                "missing_methods": {
+                                    "run_method": not has_run_method,
+                                    "description": not has_description
+                                }
+                            },
+                            response_time_ms=response_time_ms,
+                            error_message="Tool is missing required methods"
+                        ))
+
+            except Exception as e:
+                response_time_ms = (time.time() - start_time) * 1000
+                handled_error = self.error_handler.handle_error(e, operation=f"health_check_tool_{tool_name}")
+                
+                tool_statuses.append(HealthStatus(
+                    component=f"tool_{tool_name}",
+                    status="unhealthy",
+                    details={
+                        "tool_type": type(tool).__name__,
+                        "error_category": handled_error.category.value,
+                        "error_type": type(e).__name__
+                    },
+                    response_time_ms=response_time_ms,
+                    error_message=str(e)
+                ))
+
+        return tool_statuses
+
+    def check_circuit_breaker_status(self) -> HealthStatus:
+        """Check circuit breaker health and state."""
+        try:
+            cb_state = self.circuit_breaker.state
+            failure_count = self.circuit_breaker.failure_count
+            last_failure_time = self.circuit_breaker.last_failure_time
+            
+            # Determine health based on circuit breaker state
+            if cb_state == "closed":
+                status = "healthy"
+                error_message = None
+            elif cb_state == "half_open":
+                status = "degraded" 
+                error_message = "Circuit breaker is in recovery mode"
+            else:  # open
+                status = "unhealthy"
+                error_message = "Circuit breaker is open - blocking requests"
+
+            return HealthStatus(
+                component="circuit_breaker",
+                status=status,
+                details={
+                    "state": cb_state,
+                    "failure_count": failure_count,
+                    "failure_threshold": self.circuit_breaker.failure_threshold,
+                    "timeout": self.circuit_breaker.timeout,
+                    "last_failure": last_failure_time.isoformat() if last_failure_time else None
+                },
+                error_message=error_message
+            )
+
+        except Exception as e:
+            return HealthStatus(
+                component="circuit_breaker",
+                status="unhealthy",
+                details={"error": str(e)},
+                error_message=f"Failed to check circuit breaker status: {str(e)}"
+            )
+
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Collect current performance metrics."""
+        metrics = {
+            "timestamp": datetime.now().isoformat(),
+            "circuit_breaker": {
+                "state": self.circuit_breaker.state,
+                "failure_count": self.circuit_breaker.failure_count
+            }
+        }
+
+        # Add error statistics from error handler
+        if self.error_handler:
+            error_stats = self.error_handler.get_error_stats()
+            metrics["error_statistics"] = error_stats
+
+        # Add configuration information
+        if self.config:
+            metrics["configuration"] = {
+                "model": self.config.model_name,
+                "provider": self.config.model_provider,
+                "max_iterations": self.config.agent_max_iterations,
+                "retry_max_attempts": self.config.retry_max_attempts
+            }
+
+        return metrics
+
+    def perform_comprehensive_health_check(self) -> SystemHealthReport:
+        """Execute complete system health check and return comprehensive report."""
+        start_time = time.time()
+        components = []
+        
+        try:
+            # Check model connectivity
+            logging.info("Performing health check: LLM connectivity")
+            llm_status = self.check_model_connectivity()
+            components.append(llm_status)
+
+            # Check tool availability
+            logging.info("Performing health check: Tool availability")
+            tool_statuses = self.check_tool_availability()
+            components.extend(tool_statuses)
+
+            # Check circuit breaker
+            logging.info("Performing health check: Circuit breaker status")
+            cb_status = self.check_circuit_breaker_status()
+            components.append(cb_status)
+
+            # Determine overall system health
+            unhealthy_count = sum(1 for comp in components if comp.status == "unhealthy")
+            degraded_count = sum(1 for comp in components if comp.status == "degraded")
+            
+            if unhealthy_count > 0:
+                overall_status = "unhealthy"
+            elif degraded_count > 0:
+                overall_status = "degraded"
+            else:
+                overall_status = "healthy"
+
+            # Collect performance metrics
+            performance_metrics = self.get_performance_metrics()
+            performance_metrics["health_check_duration_ms"] = (time.time() - start_time) * 1000
+
+            # Get error statistics
+            error_statistics = self.error_handler.get_error_stats() if self.error_handler else {}
+
+            self.last_health_check = datetime.now()
+
+            report = SystemHealthReport(
+                overall_status=overall_status,
+                components=components,
+                performance_metrics=performance_metrics,
+                error_statistics=error_statistics
+            )
+
+            logging.info(f"Health check completed: {overall_status} ({len(components)} components checked)")
+            return report
+
+        except Exception as e:
+            # Fallback error handling
+            logging.error(f"Health check failed: {str(e)}")
+            
+            error_component = HealthStatus(
+                component="health_checker",
+                status="unhealthy",
+                details={"error": str(e), "error_type": type(e).__name__},
+                error_message=f"Health check system failure: {str(e)}"
+            )
+            
+            return SystemHealthReport(
+                overall_status="unhealthy",
+                components=[error_component],
+                performance_metrics={"health_check_duration_ms": (time.time() - start_time) * 1000},
+                error_statistics={}
+            )
+
+    def get_status_summary(self) -> Dict[str, Any]:
+        """Get a quick status summary suitable for monitoring endpoints."""
+        health_report = self.perform_comprehensive_health_check()
+        
+        return {
+            "status": health_report.overall_status,
+            "timestamp": health_report.timestamp.isoformat(),
+            "components": {
+                comp.component: {
+                    "status": comp.status,
+                    "response_time_ms": comp.response_time_ms,
+                    "error": comp.error_message
+                }
+                for comp in health_report.components
+            },
+            "metrics": {
+                "total_components": len(health_report.components),
+                "healthy_components": len([c for c in health_report.components if c.status == "healthy"]),
+                "degraded_components": len([c for c in health_report.components if c.status == "degraded"]),
+                "unhealthy_components": len([c for c in health_report.components if c.status == "unhealthy"])
+            },
+            "error_stats": health_report.error_statistics
+        }
+
+
+# Global health checker instance (will be initialized after components are created)
+health_checker: Optional[HealthChecker] = None
+
+
+# ==========================================================
 #   Main Application with Enhanced Error Handling
 # ==========================================================
 
@@ -1011,7 +1383,17 @@ try:
     # Wrap with enhanced error handling
     agent = RobustAgent(base_agent)
 
+    # Initialize health checker with all components
+    health_checker = HealthChecker(
+        llm=llm,
+        tools=custom_tools,
+        circuit_breaker=llm_circuit_breaker,
+        error_handler=error_handler,
+        config=config
+    )
+
     logging.info("ReAct agent initialized successfully with comprehensive error handling")
+    logging.info("Health monitoring system initialized successfully")
 
 except AgentError as e:
     logging.error(f"Structured error during initialization: {e.user_message}")
@@ -1032,12 +1414,33 @@ if __name__ == "__main__":
             print("Circuit Breaker Status:", llm_circuit_breaker.state)
             print("=" * 50)
 
+            # Perform initial health check
+            print("🔍 Performing System Health Check...")
+            health_summary = health_checker.get_status_summary()
+            print(f"System Status: {health_summary['status'].upper()}")
+            print(f"Components: {health_summary['metrics']['healthy_components']}/{health_summary['metrics']['total_components']} healthy")
+            
+            # Show component details
+            for comp_name, comp_data in health_summary['components'].items():
+                status_icon = "✅" if comp_data['status'] == "healthy" else "⚠️" if comp_data['status'] == "degraded" else "❌"
+                response_time = f" ({comp_data['response_time_ms']:.1f}ms)" if comp_data['response_time_ms'] else ""
+                print(f"  {status_icon} {comp_name}: {comp_data['status']}{response_time}")
+                if comp_data['error']:
+                    print(f"    Error: {comp_data['error']}")
+
+            print("=" * 50)
+
             # Test the enhanced agent with error handling
             response = agent.chat("Calculate 15% of 85.")
             print(f"Agent Response: {response}")
 
             print("\n" + "=" * 50)
             print("Error Handler Statistics:", error_handler.get_error_stats())
+
+            # Show final health status
+            print("\n🔍 Final Health Check:")
+            final_health = health_checker.get_status_summary()
+            print(f"System Status: {final_health['status'].upper()}")
 
         except Exception as e:
             handled_error = error_handler.handle_error(e, operation="main_execution")
