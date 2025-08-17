@@ -1,0 +1,124 @@
+# AI Coding Agent Instructions for Agentics
+
+## Project Overview
+This is a study project focused on LLM Agentic Applications, featuring a security-focused single-file agent implementation (`simplest_agent.py`) that uses LangChain + Ollama with a custom SafeCalculator tool.
+
+## Core Architecture
+
+### Single-File Agent Pattern
+- **Main Implementation**: `simplest_agent.py` - Complete LangChain agent in ~170 lines
+- **Key Constraint**: Maintain single-file architecture while adding enterprise features
+- **Structure Sections**: Configuration → Security → Tools → Agent → Main (see WORKPLAN.md template)
+
+### Security-First Design
+The project prioritizes security over convenience:
+```python
+# NEVER use eval() - use SafeCalculator instead
+calculator = SafeCalculator()  # AST-based parsing
+result = calculator.evaluate_expression(expression)  # Safe evaluation
+```
+
+### Tool Integration Pattern
+Custom tools inherit from `BaseTool` with Pydantic validation:
+```python
+class CalculatorTool(BaseTool):
+    name: str = "calculator" 
+    description: str = "Useful for when you need to answer questions about math"
+    
+    def _run(self, expression: str) -> str:
+        # Implement with SafeCalculator, never eval()
+```
+
+## Development Workflow
+
+### Task-Driven Development
+Follow the structured workplan in `WORKPLAN.md`:
+- **Phase 1**: Security & Safety (SafeCalculator completed ✅)
+- **Phase 2**: Error Handling & Robustness  
+- **Phase 3**: Configuration Management
+- **Phase 4**: Modern Patterns (ReAct implementation)
+
+### Testing Strategy
+Comprehensive validation is required:
+- Run `test_safe_calculator.py` for security validation
+- Run `demo_safe_calculator.py` for functionality demo
+- Validate against malicious inputs (injection patterns blocked)
+
+### Environment Setup
+```bash
+# Python virtual environment with uv
+uv sync  # Install dependencies from pyproject.toml
+source .venv/bin/activate
+python simplest_agent.py  # Requires Ollama running locally
+```
+
+## Critical Patterns
+
+### Security Validation
+Always implement multi-layer security for user inputs:
+1. **Pattern Detection**: Block `__`, `import`, `exec`, `eval`, etc.
+2. **Character Filtering**: Allow only mathematical chars for calculator
+3. **Length Limits**: Prevent DoS with input size restrictions
+4. **AST Parsing**: Use `ast` module instead of string execution
+
+### Memory Management 
+The agent uses `ConversationBufferMemory` - consider summarization for long sessions as per workplan Task 4.2.
+
+### Model Configuration
+- **Default Model**: `llama3.2:3b` via Ollama
+- **Extensible**: Support multiple providers (OpenAI, etc.) via environment variables
+- **Local-First**: Assumes local Ollama deployment at `http://127.0.0.1:11434`
+
+## Code Quality Standards
+
+### Single-File Organization
+Use clear section separators following the template in `WORKPLAN.md`:
+```python
+# ==========================================================
+#   Section Name
+# ==========================================================
+```
+
+### Error Handling
+All operations must have comprehensive error handling:
+```python
+try:
+    result = some_operation()
+    return str(result)
+except Exception as e:
+    return f"Error: {str(e)}"
+```
+
+### Documentation
+- Comprehensive docstrings for all classes and methods
+- Security rationale for SafeCalculator implementation
+- Task completion summaries (see `TASK_1_1_SUMMARY.md`)
+
+## Integration Knowledge
+
+### LangChain Patterns
+- Uses deprecated `initialize_agent` (Task 4.1 plans ReAct replacement)  
+- `AgentType.CHAT_CONVERSATIONAL_REACT_DESCRIPTION` for conversational flow
+- Custom tools require Pydantic models for input validation
+
+### Dependencies
+Minimal dependency strategy from `pyproject.toml`:
+- `langchain>=0.3.27` (core framework)
+- `langchain-ollama>=0.3.6` (local model integration)
+- `langchain-community>=0.3.27` (additional tools)
+
+## File Structure Understanding
+- `main.py`: Basic hello world (not the main agent)
+- `simplest_agent.py`: The actual LLM agent implementation
+- `notes/`: Comprehensive guides on LLM agents and protocols
+- Test files validate security and functionality separately
+- `WORKPLAN.md`: Structured improvement roadmap with phases
+
+## Development Priorities
+1. **Security First**: Never compromise on input validation and safe evaluation
+2. **Single-File Constraint**: Maintain simplicity while adding enterprise features
+3. **Task-Based Progress**: Follow workplan phases systematically
+4. **Comprehensive Testing**: Validate both functionality and security
+5. **Documentation**: Document security rationale and implementation decisions
+
+When modifying this codebase, always consider the security implications first, maintain the single-file architecture constraint, and follow the structured workplan for systematic improvements.
