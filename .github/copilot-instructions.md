@@ -12,9 +12,10 @@ This is a study project focused on LLM Agentic Applications, featuring a securit
 ## Core Architecture
 
 ### Single-File Agent Pattern
-- **Main Implementation**: `simplest_agent.py` - Complete LangChain agent in ~170 lines
+- **Main Implementation**: `simplest_agent.py` - Complete LangChain agent in ~1,450 lines with enterprise features
 - **Key Constraint**: Maintain single-file architecture while adding enterprise features
-- **Structure Sections**: Configuration → Security → Tools → Agent → Main (see WORKPLAN.md template)
+- **Structure Sections**: Configuration → Security → Tools → Agent → Main (see MODERNIZATION_WORKPLAN.md)
+- **Enterprise Features**: Error handling, circuit breakers, retry mechanisms, health monitoring, comprehensive configuration
 
 ### Security-First Design
 The project prioritizes security over convenience:
@@ -38,16 +39,22 @@ class CalculatorTool(BaseTool):
 ## Development Workflow
 
 ### Task-Driven Development
-Follow the structured workplan in `WORKPLAN.md`:
-- **Phase 1**: Security & Safety (SafeCalculator completed ✅)
-- **Phase 2**: Error Handling & Robustness  
-- **Phase 3**: Configuration Management
-- **Phase 4**: Modern Patterns (ReAct implementation)
+Follow the structured modernization workplan in `notes/MODERNIZATION_WORKPLAN.md`:
+- **Phase 1**: pytest Migration & Testing Infrastructure ✅ **COMPLETED**
+- **Phase 2**: Code Architecture Modularization
+- **Phase 3**: Enhanced Documentation & Maintainability
+- **Phase 4**: Performance & Security Hardening
 
 ### Testing Strategy
-Comprehensive validation is required:
-- Run `test_safe_calculator.py` for security validation
+**Professional pytest Infrastructure** (Phase 1 completed):
+- **143 comprehensive tests** organized in `tests/` directory
+- **Unit tests**: `tests/unit/` - 113 tests with 100% pass rate
+- **Integration tests**: `tests/integration/` - 30 tests for system-level validation
+- **Security tests**: Marked with `@pytest.mark.security` decorator
+- **Test execution**: Use `./scripts/test_runner.sh` for convenient test running
+- **Coverage reporting**: pytest-cov integration with HTML reports
 - Run `demo_safe_calculator.py` for functionality demo
+- Validate against malicious inputs (injection patterns blocked)
 - Validate against malicious inputs (injection patterns blocked)
 
 ### Environment Setup
@@ -67,8 +74,22 @@ Always implement multi-layer security for user inputs:
 3. **Length Limits**: Prevent DoS with input size restrictions
 4. **AST Parsing**: Use `ast` module instead of string execution
 
+### Enterprise-Grade Error Handling
+The project implements comprehensive error handling:
+```python
+try:
+    result = some_operation()
+    return str(result)
+except Exception as e:
+    return f"Error: {str(e)}"
+```
+- **AgentError**: Custom exception with error categorization
+- **ErrorHandler**: Central error processing with logging
+- **Circuit Breaker**: Fail-fast patterns for resilience
+- **Retry Logic**: Exponential backoff with jitter
+
 ### Memory Management 
-The agent uses `ConversationBufferMemory` - consider summarization for long sessions as per workplan Task 4.2.
+The agent uses `ConversationBufferMemory` - consider summarization for long sessions as per modernization workplan.
 
 ### Model Configuration
 - **Default Model**: `llama3.2:3b` via Ollama
@@ -78,7 +99,7 @@ The agent uses `ConversationBufferMemory` - consider summarization for long sess
 ## Code Quality Standards
 
 ### Single-File Organization
-Use clear section separators following the template in `WORKPLAN.md`:
+Use clear section separators following the template in `MODERNIZATION_WORKPLAN.md`:
 ```python
 # ==========================================================
 #   Section Name
@@ -112,13 +133,15 @@ Minimal dependency strategy from `pyproject.toml`:
 - `langchain>=0.3.27` (core framework)
 - `langchain-ollama>=0.3.6` (local model integration)
 - `langchain-community>=0.3.27` (additional tools)
+- **Development Dependencies**: `pytest>=8.0.0`, `pytest-cov`, `pytest-mock`, `pytest-asyncio`
 
 ## File Structure Understanding
 - `main.py`: Basic hello world (not the main agent)
 - `simplest_agent.py`: The actual LLM agent implementation
 - `notes/`: Comprehensive guides on LLM agents and protocols
-- Test files validate security and functionality separately
-- `WORKPLAN.md`: Structured improvement roadmap with phases
+- `tests/`: Professional pytest infrastructure with unit and integration tests
+- `scripts/`: Test execution and development utilities
+- `MODERNIZATION_WORKPLAN.md`: Structured improvement roadmap with phases
 
 ## Development Priorities
 1. **Security First**: Never compromise on input validation and safe evaluation
@@ -126,5 +149,11 @@ Minimal dependency strategy from `pyproject.toml`:
 3. **Task-Based Progress**: Follow workplan phases systematically
 4. **Comprehensive Testing**: Validate both functionality and security
 5. **Documentation**: Document security rationale and implementation decisions
+
+## Current Development Status
+- **Phase 1 Complete**: Professional pytest infrastructure with 143 tests (96% pass rate)
+- **Legacy Files Removed**: All custom test files have been migrated to pytest
+- **Ready for Phase 2**: Code architecture modularization can begin
+- **Enterprise Features**: Circuit breakers, retry mechanisms, health monitoring implemented
 
 When modifying this codebase, always consider the security implications first, maintain the single-file architecture constraint, and follow the structured workplan for systematic improvements.
