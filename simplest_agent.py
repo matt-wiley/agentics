@@ -3,7 +3,6 @@ import ast
 import operator
 import time
 import logging
-import json
 import math
 import traceback
 from functools import wraps
@@ -17,162 +16,164 @@ from langchain.memory import ConversationBufferMemory
 from langchain.tools import BaseTool
 from pydantic import BaseModel, Field
 
+from agentics.config.settings import AgentConfig
+
 # ==========================================================
 #   Configuration Management System
 # ==========================================================
 
-@dataclass
-class AgentConfig:
-    """Comprehensive configuration management for the agent."""
+# @dataclass
+# class AgentConfig:
+#     """Comprehensive configuration management for the agent."""
 
-    # Model Configuration
-    model_name: str = field(default_factory=lambda: os.getenv("AGENT_MODEL", "llama3.2:3b"))
-    model_provider: str = field(default_factory=lambda: os.getenv("AGENT_PROVIDER", "ollama"))
-    model_temperature: float = field(default_factory=lambda: float(os.getenv("AGENT_TEMPERATURE", "0.0")))
+#     # Model Configuration
+#     model_name: str = field(default_factory=lambda: os.getenv("AGENT_MODEL", "llama3.2:3b"))
+#     model_provider: str = field(default_factory=lambda: os.getenv("AGENT_PROVIDER", "ollama"))
+#     model_temperature: float = field(default_factory=lambda: float(os.getenv("AGENT_TEMPERATURE", "0.0")))
 
-    # API Configuration
-    ollama_base_url: str = field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"))
-    openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
-    openai_api_base: str = field(default_factory=lambda: os.getenv("OPENAI_API_BASE", ""))
-    litellm_key: str = field(default_factory=lambda: os.getenv("LITELLM_KEY", ""))
-    litellm_base_url: str = field(default_factory=lambda: os.getenv("LITELLM_BASE_URL", "http://127.0.0.1:4000"))
+#     # API Configuration
+#     ollama_base_url: str = field(default_factory=lambda: os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"))
+#     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
+#     openai_api_base: str = field(default_factory=lambda: os.getenv("OPENAI_API_BASE", ""))
+#     litellm_key: str = field(default_factory=lambda: os.getenv("LITELLM_KEY", ""))
+#     litellm_base_url: str = field(default_factory=lambda: os.getenv("LITELLM_BASE_URL", "http://127.0.0.1:4000"))
 
-    # Agent Behavior Configuration
-    agent_verbose: bool = field(default_factory=lambda: os.getenv("AGENT_VERBOSE", "true").lower() == "true")
-    agent_max_iterations: int = field(default_factory=lambda: int(os.getenv("AGENT_MAX_ITERATIONS", "15")))
-    agent_timeout: int = field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT", "300")))
+#     # Agent Behavior Configuration
+#     agent_verbose: bool = field(default_factory=lambda: os.getenv("AGENT_VERBOSE", "true").lower() == "true")
+#     agent_max_iterations: int = field(default_factory=lambda: int(os.getenv("AGENT_MAX_ITERATIONS", "15")))
+#     agent_timeout: int = field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT", "300")))
 
-    # Retry Configuration
-    retry_max_attempts: int = field(default_factory=lambda: int(os.getenv("RETRY_MAX_ATTEMPTS", "3")))
-    retry_base_delay: float = field(default_factory=lambda: float(os.getenv("RETRY_BASE_DELAY", "1.0")))
-    retry_max_delay: float = field(default_factory=lambda: float(os.getenv("RETRY_MAX_DELAY", "60.0")))
+#     # Retry Configuration
+#     retry_max_attempts: int = field(default_factory=lambda: int(os.getenv("RETRY_MAX_ATTEMPTS", "3")))
+#     retry_base_delay: float = field(default_factory=lambda: float(os.getenv("RETRY_BASE_DELAY", "1.0")))
+#     retry_max_delay: float = field(default_factory=lambda: float(os.getenv("RETRY_MAX_DELAY", "60.0")))
 
-    # Circuit Breaker Configuration
-    circuit_breaker_failure_threshold: int = field(default_factory=lambda: int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")))
-    circuit_breaker_timeout: int = field(default_factory=lambda: int(os.getenv("CIRCUIT_BREAKER_TIMEOUT", "60")))
+#     # Circuit Breaker Configuration
+#     circuit_breaker_failure_threshold: int = field(default_factory=lambda: int(os.getenv("CIRCUIT_BREAKER_FAILURE_THRESHOLD", "5")))
+#     circuit_breaker_timeout: int = field(default_factory=lambda: int(os.getenv("CIRCUIT_BREAKER_TIMEOUT", "60")))
 
-    # Calculator Configuration
-    calculator_max_expression_length: int = field(default_factory=lambda: int(os.getenv("CALCULATOR_MAX_LENGTH", "1000")))
-    calculator_max_power: int = field(default_factory=lambda: int(os.getenv("CALCULATOR_MAX_POWER", "100")))
+#     # Calculator Configuration
+#     calculator_max_expression_length: int = field(default_factory=lambda: int(os.getenv("CALCULATOR_MAX_LENGTH", "1000")))
+#     calculator_max_power: int = field(default_factory=lambda: int(os.getenv("CALCULATOR_MAX_POWER", "100")))
 
-    # Logging Configuration
-    log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
-    log_format: str = field(default_factory=lambda: os.getenv("LOG_FORMAT", "%(asctime)s - %(levelname)s - %(message)s"))
+#     # Logging Configuration
+#     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
+#     log_format: str = field(default_factory=lambda: os.getenv("LOG_FORMAT", "%(asctime)s - %(levelname)s - %(message)s"))
 
-    # Memory Configuration
-    memory_key: str = field(default_factory=lambda: os.getenv("MEMORY_KEY", "chat_history"))
-    memory_return_messages: bool = field(default_factory=lambda: os.getenv("MEMORY_RETURN_MESSAGES", "true").lower() == "true")
+#     # Memory Configuration
+#     memory_key: str = field(default_factory=lambda: os.getenv("MEMORY_KEY", "chat_history"))
+#     memory_return_messages: bool = field(default_factory=lambda: os.getenv("MEMORY_RETURN_MESSAGES", "true").lower() == "true")
 
-    def validate(self) -> List[str]:
-        """Validate configuration and return list of validation errors."""
-        errors = []
+#     def validate(self) -> List[str]:
+#         """Validate configuration and return list of validation errors."""
+#         errors = []
 
-        # Validate model configuration
-        if not self.model_name:
-            errors.append("AGENT_MODEL cannot be empty")
+#         # Validate model configuration
+#         if not self.model_name:
+#             errors.append("AGENT_MODEL cannot be empty")
 
-        if self.model_provider not in ["ollama", "openai", "litellm"]:
-            errors.append(f"AGENT_PROVIDER must be one of: ollama, openai, litellm. Got: {self.model_provider}")
+#         if self.model_provider not in ["ollama", "openai", "litellm"]:
+#             errors.append(f"AGENT_PROVIDER must be one of: ollama, openai, litellm. Got: {self.model_provider}")
 
-        if not (0.0 <= self.model_temperature <= 2.0):
-            errors.append(f"AGENT_TEMPERATURE must be between 0.0 and 2.0. Got: {self.model_temperature}")
+#         if not (0.0 <= self.model_temperature <= 2.0):
+#             errors.append(f"AGENT_TEMPERATURE must be between 0.0 and 2.0. Got: {self.model_temperature}")
 
-        # Validate API configuration based on provider
-        if self.model_provider == "ollama" and not self.ollama_base_url:
-            errors.append("OLLAMA_BASE_URL is required when using ollama provider")
+#         # Validate API configuration based on provider
+#         if self.model_provider == "ollama" and not self.ollama_base_url:
+#             errors.append("OLLAMA_BASE_URL is required when using ollama provider")
 
-        if self.model_provider == "openai" and not self.openai_api_key:
-            errors.append("OPENAI_API_KEY is required when using openai provider")
+#         if self.model_provider == "openai" and not self.openai_api_key:
+#             errors.append("OPENAI_API_KEY is required when using openai provider")
 
-        if self.model_provider == "litellm" and not self.litellm_key:
-            errors.append("LITELLM_KEY is required when using litellm provider")
+#         if self.model_provider == "litellm" and not self.litellm_key:
+#             errors.append("LITELLM_KEY is required when using litellm provider")
 
-        # Validate numeric ranges
-        if self.agent_max_iterations < 1:
-            errors.append(f"AGENT_MAX_ITERATIONS must be >= 1. Got: {self.agent_max_iterations}")
+#         # Validate numeric ranges
+#         if self.agent_max_iterations < 1:
+#             errors.append(f"AGENT_MAX_ITERATIONS must be >= 1. Got: {self.agent_max_iterations}")
 
-        if self.agent_timeout < 1:
-            errors.append(f"AGENT_TIMEOUT must be >= 1. Got: {self.agent_timeout}")
+#         if self.agent_timeout < 1:
+#             errors.append(f"AGENT_TIMEOUT must be >= 1. Got: {self.agent_timeout}")
 
-        if self.retry_max_attempts < 1:
-            errors.append(f"RETRY_MAX_ATTEMPTS must be >= 1. Got: {self.retry_max_attempts}")
+#         if self.retry_max_attempts < 1:
+#             errors.append(f"RETRY_MAX_ATTEMPTS must be >= 1. Got: {self.retry_max_attempts}")
 
-        if self.retry_base_delay <= 0:
-            errors.append(f"RETRY_BASE_DELAY must be > 0. Got: {self.retry_base_delay}")
+#         if self.retry_base_delay <= 0:
+#             errors.append(f"RETRY_BASE_DELAY must be > 0. Got: {self.retry_base_delay}")
 
-        if self.retry_max_delay <= self.retry_base_delay:
-            errors.append(f"RETRY_MAX_DELAY must be > RETRY_BASE_DELAY. Got: {self.retry_max_delay} <= {self.retry_base_delay}")
+#         if self.retry_max_delay <= self.retry_base_delay:
+#             errors.append(f"RETRY_MAX_DELAY must be > RETRY_BASE_DELAY. Got: {self.retry_max_delay} <= {self.retry_base_delay}")
 
-        if self.circuit_breaker_failure_threshold < 1:
-            errors.append(f"CIRCUIT_BREAKER_FAILURE_THRESHOLD must be >= 1. Got: {self.circuit_breaker_failure_threshold}")
+#         if self.circuit_breaker_failure_threshold < 1:
+#             errors.append(f"CIRCUIT_BREAKER_FAILURE_THRESHOLD must be >= 1. Got: {self.circuit_breaker_failure_threshold}")
 
-        if self.circuit_breaker_timeout < 1:
-            errors.append(f"CIRCUIT_BREAKER_TIMEOUT must be >= 1. Got: {self.circuit_breaker_timeout}")
+#         if self.circuit_breaker_timeout < 1:
+#             errors.append(f"CIRCUIT_BREAKER_TIMEOUT must be >= 1. Got: {self.circuit_breaker_timeout}")
 
-        if self.calculator_max_expression_length < 10:
-            errors.append(f"CALCULATOR_MAX_LENGTH must be >= 10. Got: {self.calculator_max_expression_length}")
+#         if self.calculator_max_expression_length < 10:
+#             errors.append(f"CALCULATOR_MAX_LENGTH must be >= 10. Got: {self.calculator_max_expression_length}")
 
-        if self.calculator_max_power < 1:
-            errors.append(f"CALCULATOR_MAX_POWER must be >= 1. Got: {self.calculator_max_power}")
+#         if self.calculator_max_power < 1:
+#             errors.append(f"CALCULATOR_MAX_POWER must be >= 1. Got: {self.calculator_max_power}")
 
-        # Validate log level
-        valid_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        if self.log_level.upper() not in valid_log_levels:
-            errors.append(f"LOG_LEVEL must be one of: {valid_log_levels}. Got: {self.log_level}")
+#         # Validate log level
+#         valid_log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+#         if self.log_level.upper() not in valid_log_levels:
+#             errors.append(f"LOG_LEVEL must be one of: {valid_log_levels}. Got: {self.log_level}")
 
-        return errors
+#         return errors
 
-    def setup_environment(self) -> None:
-        """Set up environment variables for compatibility with existing code."""
-        # Set up OpenAI environment variables for LangChain compatibility
-        if self.model_provider == "openai":
-            os.environ["OPENAI_API_KEY"] = self.openai_api_key
-            if self.openai_api_base:
-                os.environ["OPENAI_API_BASE"] = self.openai_api_base
-        elif self.model_provider == "litellm":
-            os.environ["OPENAI_API_KEY"] = self.litellm_key
-            os.environ["OPENAI_API_BASE"] = self.litellm_base_url
+#     def setup_environment(self) -> None:
+#         """Set up environment variables for compatibility with existing code."""
+#         # Set up OpenAI environment variables for LangChain compatibility
+#         if self.model_provider == "openai":
+#             os.environ["OPENAI_API_KEY"] = self.openai_api_key
+#             if self.openai_api_base:
+#                 os.environ["OPENAI_API_BASE"] = self.openai_api_base
+#         elif self.model_provider == "litellm":
+#             os.environ["OPENAI_API_KEY"] = self.litellm_key
+#             os.environ["OPENAI_API_BASE"] = self.litellm_base_url
 
-        # Set up logging configuration
-        logging.basicConfig(
-            level=getattr(logging, self.log_level.upper()),
-            format=self.log_format
-        )
+#         # Set up logging configuration
+#         logging.basicConfig(
+#             level=getattr(logging, self.log_level.upper()),
+#             format=self.log_format
+#         )
 
-    def get_model_kwargs(self) -> Dict[str, Any]:
-        """Get model initialization parameters based on provider."""
-        base_kwargs = {
-            "model": self.model_name,
-            "temperature": self.model_temperature
-        }
+#     def get_model_kwargs(self) -> Dict[str, Any]:
+#         """Get model initialization parameters based on provider."""
+#         base_kwargs = {
+#             "model": self.model_name,
+#             "temperature": self.model_temperature
+#         }
 
-        if self.model_provider == "ollama":
-            base_kwargs.update({
-                "provider": "ollama",
-                "base_url": self.ollama_base_url
-            })
+#         if self.model_provider == "ollama":
+#             base_kwargs.update({
+#                 "provider": "ollama",
+#                 "base_url": self.ollama_base_url
+#             })
 
-        return base_kwargs
+#         return base_kwargs
 
-    def __post_init__(self):
-        """Validate configuration after initialization."""
-        validation_errors = self.validate()
-        if validation_errors:
-            error_message = "Configuration validation failed:\n" + "\n".join(f"  - {error}" for error in validation_errors)
-            raise AgentError(
-                error_message,
-                ErrorCategory.CONFIGURATION,
-                context={"validation_errors": validation_errors},
-                user_message="The agent configuration has invalid settings. Please check your environment variables.",
-                recovery_suggestions=[
-                    "Review and correct the environment variables mentioned in the errors",
-                    "Check the documentation for valid configuration values",
-                    "Ensure all required environment variables are set for your chosen provider"
-                ]
-            )
+#     def __post_init__(self):
+#         """Validate configuration after initialization."""
+#         validation_errors = self.validate()
+#         if validation_errors:
+#             error_message = "Configuration validation failed:\n" + "\n".join(f"  - {error}" for error in validation_errors)
+#             raise AgentError(
+#                 error_message,
+#                 ErrorCategory.CONFIGURATION,
+#                 context={"validation_errors": validation_errors},
+#                 user_message="The agent configuration has invalid settings. Please check your environment variables.",
+#                 recovery_suggestions=[
+#                     "Review and correct the environment variables mentioned in the errors",
+#                     "Check the documentation for valid configuration values",
+#                     "Ensure all required environment variables are set for your chosen provider"
+#                 ]
+#             )
 
-        # Set up environment after successful validation
-        self.setup_environment()
+#         # Set up environment after successful validation
+#         self.setup_environment()
 
 
 # Global configuration instance
@@ -1026,23 +1027,26 @@ class HealthChecker:
                 
                 # Check for reasonable response
                 if content_length > 0 and content_length < 1000:
+                    model_name = self.config.model_name if self.config else "unknown"
+                    provider = self.config.model_provider if self.config else "unknown"
                     return HealthStatus(
                         component="llm_model",
                         status="healthy",
                         details={
-                            "model": self.config.model_name,
-                            "provider": self.config.model_provider,
+                            "model": model_name,
+                            "provider": provider,
                             "response_length": content_length,
                             "test_successful": True
                         },
                         response_time_ms=response_time_ms
                     )
                 else:
+                    model_name = self.config.model_name if self.config else "unknown"
                     return HealthStatus(
                         component="llm_model",
                         status="degraded",
                         details={
-                            "model": self.config.model_name,
+                            "model": model_name,
                             "response_length": content_length,
                             "issue": "Unexpected response format"
                         },
@@ -1050,11 +1054,12 @@ class HealthChecker:
                         error_message="Model response format is unexpected"
                     )
             else:
+                model_name = self.config.model_name if self.config else "unknown"
                 return HealthStatus(
                     component="llm_model",
                     status="unhealthy",
                     details={
-                        "model": self.config.model_name,
+                        "model": model_name,
                         "response": str(test_response)
                     },
                     response_time_ms=response_time_ms,
@@ -1066,14 +1071,19 @@ class HealthChecker:
             error_message = str(e)
             
             # Classify the error using our existing system
-            handled_error = self.error_handler.handle_error(e, operation="health_check_llm")
+            if self.error_handler:
+                handled_error = self.error_handler.handle_error(e, operation="health_check_llm")
+                error_category = handled_error.category.value
+            else:
+                error_category = "unknown"
             
+            model_name = self.config.model_name if self.config else "unknown"
             return HealthStatus(
                 component="llm_model",
                 status="unhealthy",
                 details={
-                    "model": self.config.model_name,
-                    "error_category": handled_error.category.value,
+                    "model": model_name,
+                    "error_category": error_category,
                     "error_type": type(e).__name__
                 },
                 response_time_ms=response_time_ms,
@@ -1086,7 +1096,8 @@ class HealthChecker:
         
         for tool in self.tools:
             start_time = time.time()
-            tool_name = getattr(tool, 'name', type(tool).__name__)
+            tool_class_name = type(tool).__name__
+            tool_name = getattr(tool, 'name', tool_class_name)
             
             try:
                 # Test calculator tool specifically
@@ -1095,12 +1106,14 @@ class HealthChecker:
                     test_result = tool._run("2 + 2")
                     response_time_ms = (time.time() - start_time) * 1000
                     
-                    if test_result == "4" or test_result == "4.0":
+                    # Check if result is correct (allow for different string formats)
+                    if str(test_result).strip() in ["4", "4.0"]:
                         tool_statuses.append(HealthStatus(
-                            component=f"tool_{tool_name}",
+                            component=f"tool_{tool_class_name}",
                             status="healthy",
                             details={
-                                "tool_type": type(tool).__name__,
+                                "tool_type": tool_class_name,
+                                "tool_name": tool_name,
                                 "test_calculation": "2 + 2",
                                 "result": test_result
                             },
@@ -1108,10 +1121,11 @@ class HealthChecker:
                         ))
                     else:
                         tool_statuses.append(HealthStatus(
-                            component=f"tool_{tool_name}",
+                            component=f"tool_{tool_class_name}",
                             status="degraded",
                             details={
-                                "tool_type": type(tool).__name__,
+                                "tool_type": tool_class_name,
+                                "tool_name": tool_name,
                                 "test_calculation": "2 + 2",
                                 "unexpected_result": test_result
                             },
@@ -1119,29 +1133,69 @@ class HealthChecker:
                             error_message=f"Tool returned unexpected result: {test_result}"
                         ))
                 else:
-                    # Generic tool test - just check if it has required methods
-                    response_time_ms = (time.time() - start_time) * 1000
+                    # Generic tool test - check if it has required methods AND test functionality
                     has_run_method = hasattr(tool, '_run') or hasattr(tool, 'run')
                     has_description = hasattr(tool, 'description')
                     
                     if has_run_method and has_description:
-                        tool_statuses.append(HealthStatus(
-                            component=f"tool_{tool_name}",
-                            status="healthy",
-                            details={
-                                "tool_type": type(tool).__name__,
-                                "has_run_method": has_run_method,
-                                "has_description": has_description,
-                                "description": getattr(tool, 'description', 'N/A')[:100]
-                            },
-                            response_time_ms=response_time_ms
-                        ))
+                        try:
+                            # Try to call the tool with a simple test (if it has _run)
+                            if hasattr(tool, '_run'):
+                                test_result = tool._run("test")
+                                response_time_ms = (time.time() - start_time) * 1000
+                                tool_statuses.append(HealthStatus(
+                                    component=f"tool_{tool_class_name}",
+                                    status="healthy",
+                                    details={
+                                        "tool_type": tool_class_name,
+                                        "tool_name": tool_name,
+                                        "has_run_method": has_run_method,
+                                        "has_description": has_description,
+                                        "description": getattr(tool, 'description', 'N/A')[:100],
+                                        "test_successful": True,
+                                        "test_result": str(test_result)[:50] if test_result else "None"
+                                    },
+                                    response_time_ms=response_time_ms
+                                ))
+                            else:
+                                # Tool has run method but it's not _run, just do structural check
+                                response_time_ms = (time.time() - start_time) * 1000
+                                tool_statuses.append(HealthStatus(
+                                    component=f"tool_{tool_class_name}",
+                                    status="healthy",
+                                    details={
+                                        "tool_type": tool_class_name,
+                                        "tool_name": tool_name,
+                                        "has_run_method": has_run_method,
+                                        "has_description": has_description,
+                                        "description": getattr(tool, 'description', 'N/A')[:100],
+                                        "test_type": "structural_only"
+                                    },
+                                    response_time_ms=response_time_ms
+                                ))
+                        except Exception as tool_test_error:
+                            # Tool failed functional test
+                            response_time_ms = (time.time() - start_time) * 1000
+                            tool_statuses.append(HealthStatus(
+                                component=f"tool_{tool_class_name}",
+                                status="unhealthy",
+                                details={
+                                    "tool_type": tool_class_name,
+                                    "tool_name": tool_name,
+                                    "functional_test_failed": True,
+                                    "error": str(tool_test_error)[:100]
+                                },
+                                response_time_ms=response_time_ms,
+                                error_message=f"Tool functional test failed: {str(tool_test_error)}"
+                            ))
                     else:
+                        response_time_ms = (time.time() - start_time) * 1000
                         tool_statuses.append(HealthStatus(
-                            component=f"tool_{tool_name}",
+                            component=f"tool_{tool_class_name}",
                             status="degraded",
                             details={
-                                "tool_type": type(tool).__name__,
+                                "tool_type": tool_class_name,
+                                "tool_name": tool_name,
                                 "missing_methods": {
                                     "run_method": not has_run_method,
                                     "description": not has_description
@@ -1153,14 +1207,19 @@ class HealthChecker:
 
             except Exception as e:
                 response_time_ms = (time.time() - start_time) * 1000
-                handled_error = self.error_handler.handle_error(e, operation=f"health_check_tool_{tool_name}")
+                if self.error_handler:
+                    handled_error = self.error_handler.handle_error(e, operation=f"health_check_tool_{tool_class_name}")
+                    error_category = handled_error.category.value
+                else:
+                    error_category = "unknown"
                 
                 tool_statuses.append(HealthStatus(
-                    component=f"tool_{tool_name}",
+                    component=f"tool_{tool_class_name}",
                     status="unhealthy",
                     details={
-                        "tool_type": type(tool).__name__,
-                        "error_category": handled_error.category.value,
+                        "tool_type": tool_class_name,
+                        "tool_name": tool_name,
+                        "error_category": error_category,
                         "error_type": type(e).__name__
                     },
                     response_time_ms=response_time_ms,
@@ -1172,19 +1231,34 @@ class HealthChecker:
     def check_circuit_breaker_status(self) -> HealthStatus:
         """Check circuit breaker health and state."""
         try:
+            if not self.circuit_breaker:
+                return HealthStatus(
+                    component="circuit_breaker",
+                    status="healthy",
+                    details={
+                        "state": "not_configured",
+                        "is_available": True,
+                        "message": "Circuit breaker is not configured"
+                    },
+                    error_message=None
+                )
+
             cb_state = self.circuit_breaker.state
             failure_count = self.circuit_breaker.failure_count
             last_failure_time = self.circuit_breaker.last_failure_time
             
-            # Determine health based on circuit breaker state
+            # Determine health and availability based on circuit breaker state
             if cb_state == "closed":
                 status = "healthy"
+                is_available = True
                 error_message = None
             elif cb_state == "half_open":
                 status = "degraded" 
+                is_available = True  # Still available but in recovery mode
                 error_message = "Circuit breaker is in recovery mode"
             else:  # open
                 status = "unhealthy"
+                is_available = False  # Not available when open
                 error_message = "Circuit breaker is open - blocking requests"
 
             return HealthStatus(
@@ -1192,6 +1266,7 @@ class HealthChecker:
                 status=status,
                 details={
                     "state": cb_state,
+                    "is_available": is_available,
                     "failure_count": failure_count,
                     "failure_threshold": self.circuit_breaker.failure_threshold,
                     "timeout": self.circuit_breaker.timeout,
@@ -1204,7 +1279,10 @@ class HealthChecker:
             return HealthStatus(
                 component="circuit_breaker",
                 status="unhealthy",
-                details={"error": str(e)},
+                details={
+                    "error": str(e),
+                    "is_available": False
+                },
                 error_message=f"Failed to check circuit breaker status: {str(e)}"
             )
 
@@ -1213,8 +1291,8 @@ class HealthChecker:
         metrics = {
             "timestamp": datetime.now().isoformat(),
             "circuit_breaker": {
-                "state": self.circuit_breaker.state,
-                "failure_count": self.circuit_breaker.failure_count
+                "state": self.circuit_breaker.state if self.circuit_breaker else "not_configured",
+                "failure_count": self.circuit_breaker.failure_count if self.circuit_breaker else 0
             }
         }
 

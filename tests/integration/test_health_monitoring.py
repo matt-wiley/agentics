@@ -118,12 +118,12 @@ class TestHealthCheckerInitialization:
 class TestToolAvailabilityChecking:
     """Test suite for tool availability validation."""
 
-    def test_calculator_tool_availability(self, calculator):
+    def test_calculator_tool_availability(self, calculator_tool):
         """Test availability checking for calculator tool."""
         error_handler = ErrorHandler()
         health_checker = HealthChecker(
             llm=None,
-            tools=[calculator],
+            tools=[calculator_tool],
             error_handler=error_handler
         )
 
@@ -132,7 +132,7 @@ class TestToolAvailabilityChecking:
         assert len(tool_statuses) == 1
         calc_status = tool_statuses[0]
         # The component name comes from the tool class name
-        assert calc_status.component == "tool_SafeCalculator"
+        assert calc_status.component == "tool_CalculatorTool"
         assert calc_status.status == "healthy"
         assert calc_status.response_time_ms is not None
         assert calc_status.response_time_ms >= 0
@@ -154,16 +154,20 @@ class TestToolAvailabilityChecking:
 
         assert len(tool_statuses) == 2
 
-        # Check calculator status
-        calc_status = next((s for s in tool_statuses if "SafeCalculator" in s.component), None)
+        # Check calculator status (should be healthy with functional test)
+        calc_status = next((s for s in tool_statuses if "CalculatorTool" in s.component), None)
         assert calc_status is not None
         assert calc_status.status == "healthy"
+        assert calc_status.details["test_calculation"] == "2 + 2"  # Verify functional test
 
-        # Check mock tool status
-        mock_status = next((s for s in tool_statuses if s.component == "tool_mock_tool"), None)
+        # Check mock tool status (should be healthy with functional test)
+        mock_status = next((s for s in tool_statuses if s.component == "tool_Mock"), None)
         assert mock_status is not None
-        # Mock tool should pass the general health check
-        assert mock_status.status in ["healthy", "degraded"]  # Could be either depending on response
+        assert mock_status.status == "healthy"  # Should be healthy since mock returns a result
+        assert mock_status.details.get("test_successful") is True  # Verify functional test happened
+
+        # Verify the mock was actually called
+        mock_tool._run.assert_called_once_with("test")
 
     def test_tool_failure_handling(self):
         """Test handling of tool failures during availability check."""
@@ -181,10 +185,15 @@ class TestToolAvailabilityChecking:
 
         assert len(tool_statuses) == 1
         failed_status = tool_statuses[0]
-        assert failed_status.component == "tool_failing_tool"
-        # The actual implementation might mark it as healthy if it doesn't fail the specific test path
-        # Let's be flexible with the status check
-        assert failed_status.status in ["healthy", "degraded", "unhealthy"]
+        assert failed_status.component == "tool_Mock"
+        # Should be unhealthy because the functional test failed
+        assert failed_status.status == "unhealthy"
+        assert failed_status.error_message is not None
+        assert "Tool failure" in failed_status.error_message
+        assert failed_status.details.get("functional_test_failed") is True
+
+        # Verify the failing tool was actually called
+        failing_tool._run.assert_called_once_with("test")
 
     def test_empty_tools_list(self):
         """Test tool availability checking with empty tools list."""
@@ -440,7 +449,7 @@ class TestErrorHandlingDuringHealthChecks:
 
         # Check that working tool is still healthy
         working_status = next(
-            (s for s in health_report.components if "SafeCalculator" in s.component),
+            (s for s in health_report.components if "CalculatorTool" in s.component),
             None
         )
         assert working_status is not None

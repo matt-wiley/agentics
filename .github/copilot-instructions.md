@@ -1,9 +1,26 @@
 # AI Coding Agent Instructions for Agentics
 
-## _IMPORTANT: REVIEW BEFORE STARTING_
+## Ways of Working
 
-1. Review `.github/instructions/memory.instructions.md` to load in all memorized information.
-2. Search the project for `README.md` or `CLAUDE.md` files that may explain additional details about specific directories.
+### Small Changes
+
+Commits should be limited to changes in one code file whenever possible. This is admittedly stringent, and not always possible, but this constraint will keep the commits small. This in turn gives us the chance to create small PRs, rather than big bang changes.
+
+### Well Tested
+
+Test-driven development should be leveraged to enforce design prior to implementation. Tests should cover the primary functionality first and foremost, using the fewest possible tests necessary to verify functionality. Robust testing of core functionality is priority but it must be balanced against over-testing or covering too many edge or corner cases.
+
+> _IMPORTANT_: Tests should be written before the code they are testing, and should be run before committing any changes.
+
+> _IMPORTANT_: Tests should be written in a way that they can be run in isolation, without requiring the entire codebase to be executed. This allows for faster feedback and easier debugging.
+
+> _IMPORTANT_: Tests should be _NEVER_ be written in a way that they superfically pass without actually verifying the functionality.
+
+As needed, new tests for related units should be added when appropriate, thought this also need to be balanced against over-testing or covering too many edge or corner cases.
+
+### Regress Before Commit
+
+A full regression of the complete test suite should be run before committing any changes.
 
 ## Project Overview
 This is a study project focused on LLM Agentic Applications, featuring a security-focused single-file agent implementation (`simplest_agent.py`) that uses LangChain + Ollama with a custom SafeCalculator tool.
